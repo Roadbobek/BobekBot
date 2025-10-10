@@ -8,6 +8,7 @@ import requests # for /ip-info
 from ai4free import PhindSearch # for /ask-ai
 import time
 import html
+import sqlite3
 
 # ======================================================================================================================
 
@@ -36,8 +37,84 @@ load_dotenv()
 
 # ======================================================================================================================
 
+# This is the recommended approach for handleing an sqlite3 database
+# Function to initialise our logging database.
+def initialise_log_db(db_path='BobekBot_logs_sqlite3.db'):
+    try:
+        # 'with' statement for connection
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            print(f'Logging database connected to {db_path}')
+
+            # Execute a query to get the SQLite version
+            query = 'SELECT sqlite_version();'
+            cursor.execute(query)
+            # Fetch and print the result
+            result = cursor.fetchall()
+            print('SQLite Version: {}'.format(result[0][0]))
+
+            # Example: Create a table if it doesn't exist
+            # cursor.execute("""
+            #     CREATE TABLE IF NOT EXISTS users (
+            #         user_id INTEGER PRIMARY KEY,
+            #         points INTEGER NOT NULL DEFAULT 0
+            #     )
+            # """)
+
+            # Connection is automatically committed and closed
+            # when exiting the 'with' block (unless an exception occurs)
+            conn.commit()
+            print("Logging database setup complete.")
+
+    except sqlite3.Error as error:
+        print(f'Error occurred during DB initialization: {error}')
+
+
+# Function to initialise our gambling database.
+def initialise_gambling_db(db_path='BobekBot_gambling_sqlite3.db'):
+    try:
+        # 'with' statement for connection
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            print(f'Gambling database connected to {db_path}')
+
+            # Execute a query to get the SQLite version
+            query = 'SELECT sqlite_version();'
+            cursor.execute(query)
+            # Fetch and print the result
+            result = cursor.fetchall()
+            print('SQLite Version: {}'.format(result[0][0]))
+
+            # Example: Create a table if it doesn't exist
+            # cursor.execute("""
+            #     CREATE TABLE IF NOT EXISTS users (
+            #         user_id INTEGER PRIMARY KEY,
+            #         points INTEGER NOT NULL DEFAULT 0
+            #     )
+            # """)
+
+            # Connection is automatically committed and closed
+            # when exiting the 'with' block (unless an exception occurs)
+            conn.commit()
+            print("Gambling database setup complete.")
+
+    except sqlite3.Error as error:
+        print(f'Error occurred during DB initialization: {error}')
+
+# Cleanup
+# finally:
+#     # Ensure the database connection is closed
+#     if cursor:
+#         cursor.close()
+#     if sqliteConnection:
+#         sqliteConnection.close()
+#     print('SQLite Connection closed')
+
+# ======================================================================================================================
+
 # 1. SETUP: Define the bot and its intents
-# Intents are permissions. The default intents are fine for slash commands.
+
+# Intents are permissions.
 intents = discord.Intents.default()
 intents.presences = True # This gets the "Online" status
 intents.members = True # This gets the bot onto the member list
@@ -53,7 +130,8 @@ tree = discord.app_commands.CommandTree(client)
 # - name: The name of the command users will type (e.g., /hello)
 # - description: The help text shown in the command list
 @tree.command(name="hello", description="Says hello to you!")
-async def hello_command(interaction: discord.Interaction):
+@app_commands.describe(ephemeral="Hide message and response from others.")
+async def hello_command(interaction: discord.Interaction, ephemeral: bool = False):
     """
     This is the function that runs when the /hello command is used.
     """
@@ -62,50 +140,40 @@ async def hello_command(interaction: discord.Interaction):
     # who ran it, the channel it was run in, and any arguments.
 
     # We use interaction.response.send_message() to reply.
-    await interaction.response.send_message(f"Hello, {interaction.user.mention}!") # We can use ephemeral=True to make it only visible to user
+    await interaction.response.send_message(f"Hello, {interaction.user.mention}!", ephemeral=ephemeral) # We can use ephemeral=True to make it only visible to user
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 @tree.command(name="greet", description="Greets you back!")
-async def greet_command(interaction: discord.Interaction):
+@app_commands.describe(ephemeral="Hide message and response from others.")
+async def greet_command(interaction: discord.Interaction, ephemeral: bool = False):
     """
     This is the function that runs when the /greet command is used.
     """
-    # '''interaction''' is a crucial object. It represents the slash command
-    # invocation and contains all the information about it, like the user
-    # who ran it, the channel it was run in, and any arguments.
 
-    # We use interaction.response.send_message() to reply.
-
-    greet_command_greetings = ("nigger", "faggot", "retard")
-    greet_command_greetings_choice = random.choice(greet_command_greetings)
+    greet_command_greetings = (" nigger", " faggot", " retard", "")
 
     if interaction.user.id in OWNER_IDS: # For bot owner and team members
-        await interaction.response.send_message(f"Hey Bobek <3 {interaction.user.mention}!")
-    if interaction.user.id == 1350499151418359901: # For user (1350499151418359901), (The Fentanyl Consumer)
-        await interaction.response.send_message(f"Hey baby :kissing_heart: {interaction.user.mention}")
-    if interaction.user.id == 1371270077957144707 or interaction.user.id == 1406691426036617297: # For user (1371270077957144707) and 1406691426036617297, (Chrome) and (extinct (Chrome))
-        await interaction.response.send_message(f"Hey cutie :stuck_out_tongue_winking_eye: {interaction.user.mention}")
-
-    # Regular users
-    elif greet_command_greetings_choice == "nigger":
-        await interaction.response.send_message(f"Fuck you nigger! {interaction.user.mention}")
-    elif greet_command_greetings_choice == "faggot":
-        await interaction.response.send_message(f"Fuck you faggot! {interaction.user.mention}")
-    elif greet_command_greetings_choice == "retard":
-        await interaction.response.send_message(f"Fuck you retard! {interaction.user.mention}")
+        await interaction.response.send_message(f"Hey Bobek <3 {interaction.user.mention}!", ephemeral=ephemeral)
+    elif interaction.user.id == 1350499151418359901: # For user (1350499151418359901), (The Fentanyl Consumer)
+        await interaction.response.send_message(f"Hey baby :kissing_heart: {interaction.user.mention}", ephemeral=ephemeral)
+    elif interaction.user.id == 1371270077957144707 or interaction.user.id == 1406691426036617297: # For user (1371270077957144707) and 1406691426036617297, (Chrome) and (extinct (Chrome))
+        await interaction.response.send_message(f"Hey cutie :stuck_out_tongue_winking_eye: {interaction.user.mention}", ephemeral=ephemeral)
+    else: # Regular users
+        await interaction.response.send_message(f"Fuck you{random.choice(greet_command_greetings)}! {interaction.user.mention}", ephemeral=ephemeral)
 
 # ----------------------------------------------------------------------------------------------------------------------
 
 @tree.command(name="ip-info", description="Get information about an IP address.")
 @discord.app_commands.describe(ip_address="The IP address to look up (e.g., 8.8.8.8)")
-async def ip_info_command(interaction: discord.Interaction, ip_address: str):
+@app_commands.describe(ephemeral="Hide message and response from others.")
+async def ip_info_command(interaction: discord.Interaction, ip_address: str, ephemeral: bool = False):
     """
     This is the function that runs when the /ip-info command is used.
     """
     # Defer the response first, as the API call might take a moment.
     # This tells Discord "I'm working on it!" and prevents a timeout.
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral=ephemeral)
 
     try:
         # Make the request to the IP API
@@ -130,7 +198,7 @@ async def ip_info_command(interaction: discord.Interaction, ip_address: str):
             embed.add_field(name="ISP", value=f"{ip_api.get('isp', 'N/A')}", inline=False)
             embed.add_field(name="Organization", value=f"{ip_api.get('org', 'N/A')}", inline=False)
             embed.add_field(name="AS", value=f"{ip_api.get('as', 'N/A')}", inline=False)
-            embed.set_footer(text="Powered by BobekBot and ip-api.com")
+            embed.set_footer(text="Powered by BobekBot <3")
 
             # Send the embed as a follow-up to the deferred response
             await interaction.followup.send(embed=embed)
@@ -153,14 +221,15 @@ ph = PhindSearch()
 
 @tree.command(name="ask-ai", description="Ask a question to the AI.")
 @discord.app_commands.describe(prompt="The question you want to ask the AI.")
-async def ask_ai_command(interaction: discord.Interaction, prompt: str):
+@app_commands.describe(ephemeral="Hide message and response from others.")
+async def ask_ai_command(interaction: discord.Interaction, prompt: str, ephemeral: bool = False):
     """
     This function runs when the /ask-ai command is used.
     """
     # 1. Defer the response.
     # This is crucial. It tells Discord "I'm working on it!" and gives you
     # a 15-minute window to respond, preventing a timeout error.
-    await interaction.response.defer()
+    await interaction.response.defer(ephemeral = ephemeral)
 
     try:
         # 2. Run the blocking AI function in a separate thread.
@@ -214,7 +283,7 @@ class TempMailGroup(app_commands.Group):
 
     # --- /tempmail get ---
     @app_commands.command(name="get", description="Get a new temporary email address.")
-    @app_commands.describe(ephemeral="Hide message from others.")
+    @app_commands.describe(ephemeral="Hide message and response from others.")
     async def get(self, interaction: discord.Interaction, ephemeral: bool = False):
         """Initializes a session and gets a new temp email address."""
         await interaction.response.defer(ephemeral=ephemeral)
@@ -252,7 +321,7 @@ class TempMailGroup(app_commands.Group):
 
     # --- /tempmail check ---
     @app_commands.command(name="check", description="Shows all emails in your temporary inbox.")
-    @app_commands.describe(ephemeral="Hide message from others.")
+    @app_commands.describe(ephemeral="Hide message and response from others.")
     async def check(self, interaction: discord.Interaction, ephemeral: bool = False):
         """Shows all emails in the inbox for the user's current temp email."""
         await interaction.response.defer(ephemeral=ephemeral)
@@ -306,7 +375,7 @@ class TempMailGroup(app_commands.Group):
     # --- /tempmail read ---
     @app_commands.command(name="read", description="Read a specific email from your inbox.")
     @app_commands.describe(email_id="The ID of the email you want to read.")
-    @app_commands.describe(ephemeral="Hide message from others.")
+    @app_commands.describe(ephemeral="Hide message and response from others.")
     async def read(self, interaction: discord.Interaction, email_id: str, ephemeral: bool = False):
         """Fetches and displays a full email by its ID."""
         await interaction.response.defer(ephemeral=ephemeral)
@@ -361,13 +430,20 @@ tree.add_command(TempMailGroup())
 async def on_ready():
     global OWNER_IDS # Make accessible outside this function
 
+    # Initialise databases
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, initialise_log_db)
+    await loop.run_in_executor(None, initialise_gambling_db)
+    print("All databases initialised.")
+
+
     # Fetch the application info
     app_info = await client.application_info()
 
-    print(f"Logged in as {client.user} (ID: {client.user.id})")
-    print(f"Application info: {app_info}")
-    print(f"Client info (Attributes & Methods): {dir(client)}")
-    print(f"Client info (Attributes & Values): {vars(client)}")
+    print(f"Logged in as {client.user} (ID: {client.user.id})!")
+    # print(f"Application info: {app_info}")
+    # print(f"Client info (Attributes & Methods): {dir(client)}")
+    # print(f"Client info (Attributes & Values): {vars(client)}")
 
     # # Populate OWNER_IDS list with either app owner ID, or all app team member IDs
     # Using App info (app_info).
@@ -385,45 +461,6 @@ async def on_ready():
         print("Could not determine bot owner.")
         OWNER_IDS = []
 
-    # # # Populate OWNER_IDS list with either app owner ID, or all app team member IDs
-    # # Using App info (app_info) and Client info (client).
-    # if app_info.team:
-    #     # If the bot is owned by a team, app_info.team will be a Team object
-    #     # The team.members attribute is a list of TeamMember objects
-    #     OWNER_IDS = [member.id for member in app_info.team.members]
-    #     print(f"Owner is a Team. Authorized IDs: {OWNER_IDS}")
-    # elif client.owner_id or app_info.owner.id:
-    #     # If it's single-owner, you'll get the owner's ID instead
-    #     OWNER_IDS = [client.owner_id or app_info.owner.id] # Return a list containing only the single owner's ID
-    #     print(f"Owner is a User. Authorized ID: {OWNER_IDS[0]}")
-    # else:
-    #     print("Could not determine bot owner.")
-
-    # BROKEN !!!
-    # # Using Client info (client).
-    # if client.team:
-    #     # The client.team attribute is populated at login if the bot is team-owned
-    #     OWNER_IDS = [member.id for member in client.team.members]
-    #     print(f"Owner is a Team. Authorized IDs: {OWNER_IDS}")
-    # elif client.owner_id:
-    #     # If it's not team-owned, client.owner_id will be populated instead
-    #     OWNER_IDS = [client.owner_id or client.owner.id] # Return a list containing only the single owner's ID
-    #     print(f"Owner is a User. Authorized ID: {OWNER_IDS[0]}")
-    # else:
-    #     print("Could not determine bot owner.")
-
-    # BROKEN !!!
-    # # Check if the owner is a Team
-    # if isinstance(app_info.owner, discord.Team):
-    #     # If it's a team, get the ID of every member
-    #     OWNER_IDS = [member.id for member in app_info.owner.members]
-    #     print(f"Owner is a Team. Authorized IDs: {OWNER_IDS}")
-    # else:
-    #     # If it's a single user, just get their ID
-    #     OWNER_IDS = [app_info.owner.id]
-    #     print(f"Owner is a User. Authorized ID: {OWNER_IDS[0]}")
-
-
     # This is crucial. It syncs the commands you defined in your code
     # with Discord's servers. If you add a new command, you need this
     # to make it appear.
@@ -439,7 +476,7 @@ async def on_ready():
     await client.change_presence(status=discord.Status.online, activity=activity)
     print("Bot presence set.")
 
-    print(" BobekBot initialised! ".center(60, "-"))
+    print(" BobekBot initialised! <3 ".center(60, "."))
 
 # ======================================================================================================================
 
