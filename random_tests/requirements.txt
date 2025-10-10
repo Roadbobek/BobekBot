@@ -1,0 +1,8 @@
+discord.py
+requests
+ai4free
+# https://github.com/Kritik-helpingai/Helpingai_T2
+websocket
+click
+g4f
+selenium
