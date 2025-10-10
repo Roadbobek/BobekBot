@@ -37,14 +37,14 @@ load_dotenv()
 
 # ======================================================================================================================
 
-# This is the recommended approach for handleing an sqlite3 database
-# Function to initialise our logging database.
-def initialise_log_db(db_path='BobekBot_logs_sqlite3.db'):
+# This is the recommended approach for handling an sqlite3 database
+# Function to initialise our database.
+def initialise_db(db_path='BobekBot_sqlite3.db'):
     try:
         # 'with' statement for connection
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            print(f'Logging database connected to {db_path}')
+            print(f'Database connected to {db_path}')
 
             # Execute a query to get the SQLite version
             query = 'SELECT sqlite_version();'
@@ -64,42 +64,11 @@ def initialise_log_db(db_path='BobekBot_logs_sqlite3.db'):
             # Connection is automatically committed and closed
             # when exiting the 'with' block (unless an exception occurs)
             conn.commit()
-            print("Logging database setup complete.")
+            print("Database setup complete.")
 
     except sqlite3.Error as error:
-        print(f'Error occurred during DB initialization: {error}')
+        print(f'Error occurred during Database initialization: {error}')
 
-
-# Function to initialise our gambling database.
-def initialise_gambling_db(db_path='BobekBot_gambling_sqlite3.db'):
-    try:
-        # 'with' statement for connection
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            print(f'Gambling database connected to {db_path}')
-
-            # Execute a query to get the SQLite version
-            query = 'SELECT sqlite_version();'
-            cursor.execute(query)
-            # Fetch and print the result
-            result = cursor.fetchall()
-            print('SQLite Version: {}'.format(result[0][0]))
-
-            # Example: Create a table if it doesn't exist
-            # cursor.execute("""
-            #     CREATE TABLE IF NOT EXISTS users (
-            #         user_id INTEGER PRIMARY KEY,
-            #         points INTEGER NOT NULL DEFAULT 0
-            #     )
-            # """)
-
-            # Connection is automatically committed and closed
-            # when exiting the 'with' block (unless an exception occurs)
-            conn.commit()
-            print("Gambling database setup complete.")
-
-    except sqlite3.Error as error:
-        print(f'Error occurred during DB initialization: {error}')
 
 # Cleanup
 # finally:
@@ -430,11 +399,9 @@ tree.add_command(TempMailGroup())
 async def on_ready():
     global OWNER_IDS # Make accessible outside this function
 
-    # Initialise databases
+    # Initialise database/
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, initialise_log_db)
-    await loop.run_in_executor(None, initialise_gambling_db)
-    print("All databases initialised.")
+    await loop.run_in_executor(None, initialise_db)
 
 
     # Fetch the application info
