@@ -19,4 +19,3 @@ In the .env file add your Discord App's Bot token after DISCORD_BOT_TOKEN=
 
 ---
 
-
