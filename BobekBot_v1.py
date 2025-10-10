@@ -15,6 +15,8 @@ OWNER_IDS = [] # Defined in code
 
 # ======================================================================================================================
 
+# Load secrets from environmental variables (.env file)
+
 # Function to load environment variables from a .env file
 def load_dotenv(filepath=".env"):
     try:
@@ -78,8 +80,14 @@ async def greet_command(interaction: discord.Interaction):
     greet_command_greetings = ("nigger", "faggot", "retard")
     greet_command_greetings_choice = random.choice(greet_command_greetings)
 
-    if interaction.user.id in OWNER_IDS:
+    if interaction.user.id in OWNER_IDS: # For bot owner and team members
         await interaction.response.send_message(f"Hey Bobek <3 {interaction.user.mention}!")
+    if interaction.user.id == 1350499151418359901: # For user (1350499151418359901), (The Fentanyl Consumer)
+        await interaction.response.send_message(f"Hey baby :kissing_heart: {interaction.user.mention}")
+    if interaction.user.id == 1371270077957144707 or interaction.user.id == 1406691426036617297: # For user (1371270077957144707) and 1406691426036617297, (Chrome) and (extinct (Chrome))
+        await interaction.response.send_message(f"Hey cutie :stuck_out_tongue_winking_eye: {interaction.user.mention}")
+
+    # Regular users
     elif greet_command_greetings_choice == "nigger":
         await interaction.response.send_message(f"Fuck you nigger! {interaction.user.mention}")
     elif greet_command_greetings_choice == "faggot":
@@ -206,9 +214,10 @@ class TempMailGroup(app_commands.Group):
 
     # --- /tempmail get ---
     @app_commands.command(name="get", description="Get a new temporary email address.")
-    async def get(self, interaction: discord.Interaction):
+    @app_commands.describe(ephemeral="Hide message from others.")
+    async def get(self, interaction: discord.Interaction, ephemeral: bool = False):
         """Initializes a session and gets a new temp email address."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=ephemeral)
 
         try:
             # Create a new session for the user
@@ -243,9 +252,10 @@ class TempMailGroup(app_commands.Group):
 
     # --- /tempmail check ---
     @app_commands.command(name="check", description="Shows all emails in your temporary inbox.")
-    async def check(self, interaction: discord.Interaction):
+    @app_commands.describe(ephemeral="Hide message from others.")
+    async def check(self, interaction: discord.Interaction, ephemeral: bool = False):
         """Shows all emails in the inbox for the user's current temp email."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=ephemeral)
 
         session = guerrilla_sessions.get(interaction.user.id)
         if not session:
@@ -296,9 +306,10 @@ class TempMailGroup(app_commands.Group):
     # --- /tempmail read ---
     @app_commands.command(name="read", description="Read a specific email from your inbox.")
     @app_commands.describe(email_id="The ID of the email you want to read.")
-    async def read(self, interaction: discord.Interaction, email_id: str):
+    @app_commands.describe(ephemeral="Hide message from others.")
+    async def read(self, interaction: discord.Interaction, email_id: str, ephemeral: bool = False):
         """Fetches and displays a full email by its ID."""
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=ephemeral)
 
         session = guerrilla_sessions.get(interaction.user.id)
         if not session:
