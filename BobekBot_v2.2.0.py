@@ -414,7 +414,58 @@ class EconomyManager():
 
     @staticmethod
     def send(sender_user_id: int, receiver_user_id: int, amount: int):
-        pass
+        """
+        Transfers a specified amount from a user's wallet into another user's wallet.
+
+        Args:
+            sender_user_id: The Discord ID of the sending user.
+            receiver_user_id: The Discord ID of the receiving user.
+            amount: The amount of money to send.
+
+        Returns:
+            A string indicating the status: "success", "insufficient_funds", "invalid_amount", "self_transfer", or "db_error".
+        """
+        # 1. Input Validation
+        if amount <= 0:
+            return "invalid_amount"
+        if sender_user_id == receiver_user_id:
+            return "self_transfer"
+
+        try:
+            with sqlite3.connect(DB_FILE) as conn:
+                cursor = conn.cursor()
+
+                # 2. Get sender's balance and check for sufficient funds
+                sender_wallet, _ = EconomyManager.get_balance(sender_user_id)
+                if sender_wallet is None:
+                    return "db_error"  # Sender couldn't be fetched/created
+                if amount > sender_wallet:
+                    return "insufficient_funds"
+
+                # 3. Ensure receiver exists in the database (get_balance creates them if new)
+                receiver_wallet, _ = EconomyManager.get_balance(receiver_user_id)
+                if receiver_wallet is None:
+                    return "db_error"  # Receiver couldn't be fetched/created
+
+                # 4. Perform the atomic transaction
+                # Subtract from sender
+                new_sender_wallet = sender_wallet - amount
+                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?",
+                               (new_sender_wallet, sender_user_id))
+
+                # Add to receiver
+                new_receiver_wallet = receiver_wallet + amount
+                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?",
+                               (new_receiver_wallet, receiver_user_id))
+
+                conn.commit()
+
+                print(f"[Economy] User {sender_user_id} sent {amount} to {receiver_user_id}.")
+                return "success"
+
+        except sqlite3.Error as e:
+            print(f"[FATAL EconomyManager.send ERROR] Database error between {sender_user_id} and {receiver_user_id}: {e}")
+            return "db_error"
 
 # ======================================================================================================================
 # COMMANDS
@@ -585,6 +636,40 @@ async def withdraw_command(interaction: discord.Interaction, amount: str, epheme
     else: # db_error or invalid_amount
         await interaction.response.send_message("An error occurred. Please enter a valid positive amount.", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=False)
+
+@tree.command(name="send", description="Send money from your wallet to another user.")
+@app_commands.describe(
+    receiver="The user you want to send money to.",
+    amount="The amount of money to send.",
+    ephemeral="Hide message and response from others."
+)
+async def send_command(interaction: discord.Interaction, receiver: discord.User, amount: int, ephemeral: bool = False):
+    sender = interaction.user
+    log_options = {'receiver': str(receiver), 'amount': amount}
+
+    # Prevent sending money to bots
+    if receiver.bot:
+        await interaction.response.send_message("You cannot send money to a bot.", ephemeral=False)
+        log_command(interaction, log_options, was_successful=False)
+        return
+
+    status = EconomyManager.send(sender.id, receiver.id, amount)
+
+    if status == "success":
+        await interaction.response.send_message(f":white_check_mark: You successfully sent **${amount:,}** to {receiver.mention}!")
+        log_command(interaction, log_options, was_successful=True)
+    elif status == "insufficient_funds":
+        await interaction.response.send_message(":cross_mark: You don't have enough money in your wallet to send that amount.", ephemeral=ephemeral)
+        log_command(interaction, log_options, was_successful=False)
+    elif status == "invalid_amount":
+        await interaction.response.send_message(":cross_mark: Please enter a positive amount to send.", ephemeral=ephemeral)
+        log_command(interaction, log_options, was_successful=False)
+    elif status == "self_transfer":
+        await interaction.response.send_message(":cross_mark: You cannot send money to yourself.", ephemeral=ephemeral)
+        log_command(interaction, log_options, was_successful=False)
+    else:  # db_error
+        await interaction.response.send_message("A database error occurred. Please try again later.", ephemeral=ephemeral)
+        log_command(interaction, log_options, was_successful=False)
 
 # @tree.command(name="singleplayer-coinflip", description="Singleplayer coinflip gambling.")
 # @app_commands.describe(amount="Amount to gamble.")
