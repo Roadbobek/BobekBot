@@ -289,7 +289,9 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 
 class EconomyManager():
     """Class for global EconomyManager"""
-    def get_balance(user_id:int):
+
+    @staticmethod
+    def get_balance(user_id: int):
         """Get and return wallet and bank balance for specified user, if not in DB we add."""
         try:
             with sqlite3.connect(DB_FILE) as conn:
@@ -323,16 +325,95 @@ class EconomyManager():
             print(f"[FATAL EconomyManager.get_balance ERROR] Failed to connect to Database for {user_id}: {e}")
             return (0, 0) # Return a safe default on error
 
-    def update_wallet_balance(user_id:int, amount:int):
+    @staticmethod
+    def update_wallet_balance(user_id: int, amount: int):
         pass
 
-    def deposit(user_id:int, amount:int):
-        pass
+    @staticmethod
+    def deposit(user_id: int, amount: int):
+        """
+        Deposits a specified amount from a user's wallet into their bank.
 
-    def withdraw(user_id:int, amount:int):
-        pass
+        Args:
+            user_id: The Discord ID of the user.
+            amount: The amount of money to deposit.
 
-    def send(sender_user_id:int, receiver_user_id:int, amount:int):
+        Returns:
+            A string indicating the status: "success", "insufficient_funds", "invalid_amount", or "db_error".
+        """
+        # 1. Input Validation: Ensure the amount is a positive number.
+        if amount <= 0:
+            return "invalid_amount"
+
+        try:
+            with sqlite3.connect(DB_FILE) as conn:
+                cursor = conn.cursor()
+
+                # 2. Get current balance and ensure the user exists.
+                # We don't need a separate check; get_balance handles user creation.
+                wallet_balance, bank_balance = EconomyManager.get_balance(user_id)
+
+                # 3. Check for sufficient funds in the wallet.
+                if amount > wallet_balance:
+                    return "insufficient_funds"
+
+                # 4. Perform the atomic transaction: subtract from wallet, add to bank.
+                new_wallet = wallet_balance - amount
+                new_bank = bank_balance + amount
+                cursor.execute("UPDATE economy SET wallet_balance = ?, bank_balance = ? WHERE user_id = ?",
+                               (new_wallet, new_bank, user_id))
+                conn.commit()
+
+                print(f"[Economy] User {user_id} deposited {amount}. New balance: Wallet={new_wallet}, Bank={new_bank}")
+                return "success"
+
+        except sqlite3.Error as e:
+            print(f"[FATAL EconomyManager.deposit ERROR] Database error for user {user_id}: {e}")
+            return "db_error"
+
+    @staticmethod
+    def withdraw(user_id: int, amount: int):
+        """
+        Withdraws a specified amount from a user's bank into their wallet.
+
+        Args:
+            user_id: The Discord ID of the user.
+            amount: The amount of money to withdraw.
+
+        Returns:
+            A string indicating the status: "success", "insufficient_funds", "invalid_amount", or "db_error".
+        """
+        # 1. Input Validation: Ensure the amount is a positive number.
+        if amount <= 0:
+            return "invalid_amount"
+
+        try:
+            with sqlite3.connect(DB_FILE) as conn:
+                cursor = conn.cursor()
+
+                # 2. Get current balance and ensure the user exists.
+                wallet_balance, bank_balance = EconomyManager.get_balance(user_id)
+
+                # 3. Check for sufficient funds in the bank.
+                if amount > bank_balance:
+                    return "insufficient_funds"
+
+                # 4. Perform the atomic transaction: add to wallet, subtract from bank.
+                new_wallet = wallet_balance + amount
+                new_bank = bank_balance - amount
+                cursor.execute("UPDATE economy SET wallet_balance = ?, bank_balance = ? WHERE user_id = ?",
+                               (new_wallet, new_bank, user_id))
+                conn.commit()
+
+                print(f"[Economy] User {user_id} withdrew {amount}. New balance: Wallet={new_wallet}, Bank={new_bank}")
+                return "success"
+
+        except sqlite3.Error as e:
+            print(f"[FATAL EconomyManager.withdraw ERROR] Database error for user {user_id}: {e}")
+            return "db_error"
+
+    @staticmethod
+    def send(sender_user_id: int, receiver_user_id: int, amount: int):
         pass
 
 # ======================================================================================================================
@@ -406,20 +487,119 @@ async def ask_ai_command(interaction: discord.Interaction, prompt: str, ephemera
 @tree.command(name="balance", description="Check a persons balance.")
 @app_commands.describe(user="Person to check balance for.")
 @app_commands.describe(ephemeral="Hide message and response from others.")
-async def balance_command(interaction: discord.Interaction, user: discord.Member, ephemeral: bool = False):
-    user_id = user.id
-    user_display_name = user.display_name
-    user_avatar = user.display_avatar
+async def balance_command(interaction: discord.Interaction, user: discord.Member = None, ephemeral: bool = False):
     await interaction.response.defer(ephemeral=ephemeral)
+    if user:
+        target_user = user
+    else:
+        target_user = interaction.user
+    user_display_name = target_user.display_name
+    user_avatar = target_user.display_avatar
     try:
-        balances = EconomyManager.get_balance(user_id)
+        balances = EconomyManager.get_balance(target_user.id)
         embed = discord.Embed(title=f"Balances for {user_display_name}", color=discord.Color.green())
-        embed.add_field(name=":dollar: Wallet", value=f"${balances[0]}", inline=True)
-        embed.add_field(name=":bank: Bank", value=f"${balances[1]}", inline=True)
+        embed.set_author(name=user_display_name, icon_url=user_avatar)
+        embed.add_field(name=":dollar: Wallet", value=f"**${balances[0]:,}**", inline=True)
+        embed.add_field(name=":bank: Bank", value=f"**${balances[1]:,}**", inline=True)
+        embed.set_footer(text=f"Total: ${balances[0] + balances[1]:,}")
         await interaction.followup.send(embed=embed)
         log_command(interaction, {'user': user, 'ephemeral': ephemeral}, was_successful=True)
     except Exception as e:
-        await interaction.response.send_message(f"An unknown error occurred, {e}.", ephemeral=True)
+        await interaction.followup.send(f"An unknown error occurred, {e}.", ephemeral=True)
+        print(f"[ERROR] Unknown error in /balance: ({e}).")
+
+@tree.command(name="deposit", description="Deposit money from your wallet into your bank.")
+@app_commands.describe(amount="The amount to deposit. Use 'all' to deposit everything.")
+@app_commands.describe(ephemeral="Hide message and response from others.")
+async def deposit_command(interaction: discord.Interaction, amount: str, ephemeral: bool = False):
+    user_id = interaction.user.id
+    wallet_balance, _ = EconomyManager.get_balance(user_id)
+
+    if wallet_balance is None:
+        await interaction.response.send_message(":cross_mark: Could not fetch your balance due to a database error.", ephemeral=True)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
+    try:
+        if amount.lower() == 'all':
+            deposit_amount = wallet_balance
+        else:
+            deposit_amount = int(amount)
+    except ValueError:
+        await interaction.response.send_message("Please enter a valid number or 'all'.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
+    if deposit_amount <= 0:
+        await interaction.response.send_message("You have nothing to deposit.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
+    status = EconomyManager.deposit(user_id, deposit_amount)
+
+    if status == "success":
+        await interaction.response.send_message(f":white_check_mark: Successfully deposited **${deposit_amount:,}** into your bank!", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=True)
+    elif status == "insufficient_funds":
+        await interaction.response.send_message(":cross_mark: You don't have that much money in your wallet to deposit.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+    else: # db_error or invalid_amount
+        await interaction.response.send_message("An error occurred. Please enter a valid positive amount.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+
+@tree.command(name="withdraw", description="Withdraw money from your bank into your wallet.")
+@app_commands.describe(amount="The amount to withdraw. Use 'all' to withdraw everything.")
+@app_commands.describe(ephemeral="Hide message and response from others.")
+async def withdraw_command(interaction: discord.Interaction, amount: str, ephemeral: bool = False):
+    user_id = interaction.user.id
+    _, bank_balance = EconomyManager.get_balance(user_id)
+
+    if bank_balance is None:
+        await interaction.response.send_message(":cross_mark: Could not fetch your balance due to a database error.", ephemeral=True)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
+    try:
+        if amount.lower() == 'all':
+            withdraw_amount = bank_balance
+        else:
+            withdraw_amount = int(amount)
+    except ValueError:
+        await interaction.response.send_message("Please enter a valid number or 'all'.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
+    if withdraw_amount <= 0:
+        await interaction.response.send_message("You have nothing to withdraw.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
+    status = EconomyManager.withdraw(user_id, withdraw_amount)
+
+    if status == "success":
+        await interaction.response.send_message(f":white_check_mark: Successfully withdrew **${withdraw_amount:,}** from your bank!", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=True)
+    elif status == "insufficient_funds":
+        await interaction.response.send_message(":cross_mark: You don't have that much money in your bank to withdraw.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+    else: # db_error or invalid_amount
+        await interaction.response.send_message("An error occurred. Please enter a valid positive amount.", ephemeral=ephemeral)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+
+# @tree.command(name="singleplayer-coinflip", description="Singleplayer coinflip gambling.")
+# @app_commands.describe(amount="Amount to gamble.")
+# @app_commands.describe(ephemeral="Hide message and response from others.")
+# async def sp_coinflip_command(interaction: discord.Interaction, amount: int, ephemeral: bool = False):
+#     await interaction.response.defer(ephemeral=ephemeral)
+#     try:
+#         balances = EconomyManager.get_balance(interaction.user.id)
+#         embed = discord.Embed(title=f"Gambling {} {user_display_name}", color=discord.Color.green())
+#         embed.add_field(name=":dollar: Wallet", value=f"${balances[0]}", inline=True)
+#         embed.add_field(name=":bank: Bank", value=f"${balances[1]}", inline=True)
+#         await interaction.followup.send(embed=embed)
+#         log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=True)
+#     except Exception as e:
+#         await interaction.response.send_message(f"An unknown error occurred, {e}.", ephemeral=True)
 
 @tree.command(name="owner", description="Execute a private, owner-only command.")
 @app_commands.describe(
