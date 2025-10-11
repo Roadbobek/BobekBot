@@ -399,7 +399,7 @@ tree.add_command(TempMailGroup())
 async def on_ready():
     global OWNER_IDS # Make accessible outside this function
 
-    # Initialise database/
+    # Initialise database
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, initialise_db)
 
