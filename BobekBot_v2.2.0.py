@@ -327,7 +327,37 @@ class EconomyManager():
 
     @staticmethod
     def update_wallet_balance(user_id: int, amount: int):
-        pass
+        """
+        Adds or subtracts a specified amount from a user's wallet balance.
+        The amount can be positive (to add) or negative (to subtract).
+
+        Args:
+            user_id: The Discord ID of the user.
+            amount: The amount of money to add or subtract.
+
+        Returns:
+            True if the update was successful, False otherwise.
+        """
+        try:
+            with sqlite3.connect(DB_FILE) as conn:
+                cursor = conn.cursor()
+
+                current_wallet, _ = EconomyManager.get_balance(user_id)
+                if current_wallet is None: # This would mean a DB error happened in get_balance
+                    return False
+
+                new_wallet = current_wallet + amount
+
+                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?",
+                               (new_wallet, user_id))
+                conn.commit()
+
+                print(f"[Economy] Updated user {user_id} wallet by {amount}. New balance: ...")
+                return True
+
+        except sqlite3.Error as e:
+            print(f"[FATAL EconomyManager.update_wallet_balance ERROR] Database error for user {user_id}: {e}")
+            return False
 
     @staticmethod
     def deposit(user_id: int, amount: int):
