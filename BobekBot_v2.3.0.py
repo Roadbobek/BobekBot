@@ -19,7 +19,6 @@ import re
 OWNER_IDS = []  # This will be populated in on_ready
 DB_FILE = "BobekBot_sqlite3.db"
 
-
 # ======================================================================================================================
 # DATABASE & LOGGING SETUP
 # ======================================================================================================================
@@ -34,158 +33,62 @@ def setup_database():
 
         # Create guilds table
         cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS guilds
-                       (
-                           guild_id
-                           INTEGER
-                           PRIMARY
-                           KEY,
-                           name
-                           TEXT,
-                           is_active
-                           INTEGER
-                           DEFAULT
-                           NULL, -- 1 for active, 0 for removed, NULL for external/unknown
-                           first_seen_timestamp
-                           INTEGER,
-                           removal_timestamp
-                           INTEGER
-                       );
-                       """)
+        CREATE TABLE IF NOT EXISTS guilds (
+            guild_id INTEGER PRIMARY KEY,
+            name TEXT,
+            is_active INTEGER DEFAULT NULL, -- 1 for active, 0 for removed, NULL for external/unknown
+            first_seen_timestamp INTEGER,
+            removal_timestamp INTEGER
+        );
+        """)
 
         # Create users table
         cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS users
-                       (
-                           user_id
-                           INTEGER
-                           PRIMARY
-                           KEY,
-                           username
-                           TEXT
-                           NOT
-                           NULL,
-                           first_seen_timestamp
-                           INTEGER
-                       );
-                       """)
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL,
+            first_seen_timestamp INTEGER
+        );
+        """)
 
         # Create guild name history table
         cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS guild_name_history
-                       (
-                           history_id
-                           INTEGER
-                           PRIMARY
-                           KEY
-                           AUTOINCREMENT,
-                           guild_id
-                           INTEGER
-                           NOT
-                           NULL,
-                           old_name
-                           TEXT
-                           NOT
-                           NULL,
-                           new_name
-                           TEXT
-                           NOT
-                           NULL,
-                           change_timestamp
-                           INTEGER
-                           NOT
-                           NULL,
-                           FOREIGN
-                           KEY
-                       (
-                           guild_id
-                       ) REFERENCES guilds
-                       (
-                           guild_id
-                       )
-                           );
-                       """)
+        CREATE TABLE IF NOT EXISTS guild_name_history (
+            history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            old_name TEXT NOT NULL,
+            new_name TEXT NOT NULL,
+            change_timestamp INTEGER NOT NULL,
+            FOREIGN KEY (guild_id) REFERENCES guilds (guild_id)
+        );
+        """)
 
         # Create command_logs table
         cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS command_logs
-                       (
-                           log_id
-                           INTEGER
-                           PRIMARY
-                           KEY
-                           AUTOINCREMENT,
-                           timestamp
-                           INTEGER
-                           NOT
-                           NULL,
-                           user_id
-                           INTEGER
-                           NOT
-                           NULL,
-                           guild_id
-                           INTEGER,
-                           command_name
-                           TEXT
-                           NOT
-                           NULL,
-                           options
-                           TEXT,
-                           was_successful
-                           INTEGER
-                           NOT
-                           NULL,
-                           FOREIGN
-                           KEY
-                       (
-                           user_id
-                       ) REFERENCES users
-                       (
-                           user_id
-                       ),
-                           FOREIGN KEY
-                       (
-                           guild_id
-                       ) REFERENCES guilds
-                       (
-                           guild_id
-                       )
-                           );
-                       """)
+        CREATE TABLE IF NOT EXISTS command_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            guild_id INTEGER,
+            command_name TEXT NOT NULL,
+            options TEXT,
+            was_successful INTEGER NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (user_id),
+            FOREIGN KEY (guild_id) REFERENCES guilds (guild_id)
+        );
+        """)
 
         # Create economy table
         cursor.execute("""
-                       CREATE TABLE IF NOT EXISTS economy
-                       (
-                           user_id
-                           INTEGER
-                           PRIMARY
-                           KEY,
-                           wallet_balance
-                           INTEGER
-                           NOT
-                           NULL
-                           DEFAULT
-                           0,
-                           bank_balance
-                           INTEGER
-                           NOT
-                           NULL
-                           DEFAULT
-                           1000,
-                           FOREIGN
-                           KEY
-                       (
-                           user_id
-                       ) REFERENCES users
-                       (
-                           user_id
-                       )
-                           );
-                       """)
+        CREATE TABLE IF NOT EXISTS economy (
+            user_id INTEGER PRIMARY KEY,
+            wallet_balance INTEGER NOT NULL DEFAULT 0,
+            bank_balance INTEGER NOT NULL DEFAULT 1000,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        );
+        """)
         conn.commit()
     print("[DB] Database setup complete.")
-
 
 def log_command(interaction: discord.Interaction, options: dict, was_successful: bool, error_message: str = None):
     """Logs a command usage to the database and prints to console."""
@@ -212,13 +115,13 @@ def log_command(interaction: discord.Interaction, options: dict, was_successful:
                     # Bot is not a member, this is an external server
                     db_guild_name = f"[Name Unknown: {guild_id}]"
                     log_guild_display = f"[External Server: {guild_id}]"
-
+                
                 # Add guild to DB if it doesn't exist
                 cursor.execute("INSERT OR IGNORE INTO guilds (guild_id, name, first_seen_timestamp) VALUES (?, ?, ?)",
                                (guild_id, db_guild_name, current_timestamp))
 
             # Insert the command log
-            command_name = f"{interaction.command.parent.name} {interaction.command.name}" if interaction.command.parent else interaction.command.name
+            command_name = f"{interaction.command.parent.name} {interaction.command.name}" if interaction.command and interaction.command.parent else (interaction.command.name if interaction.command else "Unknown")
             log_data = (
                 current_timestamp,
                 interaction.user.id,
@@ -238,7 +141,6 @@ def log_command(interaction: discord.Interaction, options: dict, was_successful:
     except Exception as e:
         print(f"[FATAL LOGGING ERROR] Failed to log command for user {interaction.user.id}: {e}")
 
-
 # ======================================================================================================================
 # BOT SETUP
 # ======================================================================================================================
@@ -256,7 +158,6 @@ def load_dotenv(filepath=".env"):
     except Exception as e:
         print(f"Error loading .env file: {e}")
 
-
 load_dotenv()
 
 intents = discord.Intents.default()
@@ -270,7 +171,6 @@ guerrilla_sessions = {}
 API_URL = "http://api.guerrillamail.com/ajax.php"
 USER_AGENT = "BobekBot/1.0 (DiscordBot)"
 
-
 # ======================================================================================================================
 # BOT EVENTS
 # ======================================================================================================================
@@ -281,7 +181,7 @@ async def on_ready():
     global OWNER_IDS
     setup_database()
 
-    # --- Guild Synchronization ---
+    # --- Guild Synchronization --- 
     print("[SYSTEM] Syncing guilds with the database...")
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
@@ -291,28 +191,22 @@ async def on_ready():
         # 1. Find guilds the bot was removed from while offline
         removed_guilds = db_guild_ids - current_guild_ids
         if removed_guilds:
-            cursor.executemany("UPDATE guilds SET is_active = 0, removal_timestamp = ? WHERE guild_id = ?",
-                               [(int(time.time()), gid) for gid in removed_guilds])
+            cursor.executemany("UPDATE guilds SET is_active = 0, removal_timestamp = ? WHERE guild_id = ?", [(int(time.time()), gid) for gid in removed_guilds])
             print(f"[SYSTEM] Marked {len(removed_guilds)} guild(s) as inactive (bot was removed while offline).")
 
         # 2. Find guilds the bot was added to while offline
         added_guilds = current_guild_ids - db_guild_ids
         if added_guilds:
-            added_guild_data = [(guild.id, guild.name, 1, int(time.time())) for guild in client.guilds if
-                                guild.id in added_guilds]
-            cursor.executemany(
-                "INSERT INTO guilds (guild_id, name, is_active, first_seen_timestamp) VALUES (?, ?, ?, ?)",
-                added_guild_data)
+            added_guild_data = [(guild.id, guild.name, 1, int(time.time())) for guild in client.guilds if guild.id in added_guilds]
+            cursor.executemany("INSERT INTO guilds (guild_id, name, is_active, first_seen_timestamp) VALUES (?, ?, ?, ?)", added_guild_data)
             print(f"[SYSTEM] Detected {len(added_guilds)} new guild(s) joined while offline.")
 
         # 3. Update existing guilds (name might have changed, or bot was re-invited)
         existing_guilds = current_guild_ids.intersection(db_guild_ids)
         if existing_guilds:
-            update_guild_data = [(guild.name, 1, None, guild.id) for guild in client.guilds if
-                                 guild.id in existing_guilds]  # Set removal_timestamp to NULL
-            cursor.executemany("UPDATE guilds SET name = ?, is_active = ?, removal_timestamp = ? WHERE guild_id = ?",
-                               update_guild_data)
-
+            update_guild_data = [(guild.name, 1, None, guild.id) for guild in client.guilds if guild.id in existing_guilds] # Set removal_timestamp to NULL
+            cursor.executemany("UPDATE guilds SET name = ?, is_active = ?, removal_timestamp = ? WHERE guild_id = ?", update_guild_data)
+        
         conn.commit()
     print(f"[SYSTEM] Guild sync complete. Now in {len(client.guilds)} servers.")
 
@@ -333,30 +227,23 @@ async def on_ready():
     print("[SYSTEM] Bot presence set.")
     print(f" BobekBot initialised! <3 ".center(60, "."))
 
-
 @client.event
 async def on_guild_join(guild: discord.Guild):
     """Logs when the bot joins a new server."""
     with sqlite3.connect(DB_FILE) as conn:
         # On join, set as active, update name, and set first_seen if it's new, clear removal time
-        conn.execute(
-            "INSERT INTO guilds (guild_id, name, is_active, first_seen_timestamp) VALUES (?, ?, 1, ?) ON CONFLICT(guild_id) DO UPDATE SET name=excluded.name, is_active=1, removal_timestamp=NULL",
-            (guild.id, guild.name, int(time.time())))
+        conn.execute("INSERT INTO guilds (guild_id, name, is_active, first_seen_timestamp) VALUES (?, ?, 1, ?) ON CONFLICT(guild_id) DO UPDATE SET name=excluded.name, is_active=1, removal_timestamp=NULL", 
+                     (guild.id, guild.name, int(time.time())))
         conn.commit()
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [GUILD] Joined server: '{guild.name}' ({guild.id}). Now in {len(client.guilds)} servers.")
-
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [GUILD] Joined server: '{guild.name}' ({guild.id}). Now in {len(client.guilds)} servers.")
 
 @client.event
 async def on_guild_remove(guild: discord.Guild):
     """Logs when the bot is removed from a server."""
     with sqlite3.connect(DB_FILE) as conn:
-        conn.execute("UPDATE guilds SET is_active = 0, removal_timestamp = ? WHERE guild_id = ?",
-                     (int(time.time()), guild.id))
+        conn.execute("UPDATE guilds SET is_active = 0, removal_timestamp = ? WHERE guild_id = ?", (int(time.time()), guild.id))
         conn.commit()
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [GUILD] Removed from server: '{guild.name}' ({guild.id}). Now in {len(client.guilds)} servers.")
-
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [GUILD] Removed from server: '{guild.name}' ({guild.id}). Now in {len(client.guilds)} servers.")
 
 @client.event
 async def on_guild_update(before: discord.Guild, after: discord.Guild):
@@ -366,13 +253,10 @@ async def on_guild_update(before: discord.Guild, after: discord.Guild):
             # Update the main guilds table with the new name
             conn.execute("UPDATE guilds SET name = ? WHERE guild_id = ?", (after.name, after.id))
             # Add a permanent record of the name change to the history table
-            conn.execute(
-                "INSERT INTO guild_name_history (guild_id, old_name, new_name, change_timestamp) VALUES (?, ?, ?, ?)",
-                (after.id, before.name, after.name, int(time.time())))
+            conn.execute("INSERT INTO guild_name_history (guild_id, old_name, new_name, change_timestamp) VALUES (?, ?, ?, ?)",
+                         (after.id, before.name, after.name, int(time.time())))
             conn.commit()
-        print(
-            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [GUILD] Server '{before.name}' renamed to '{after.name}' ({after.id}).")
-
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [GUILD] Server '{before.name}' renamed to '{after.name}' ({after.id}).")
 
 @tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -381,8 +265,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     options = {opt['name']: opt['value'] for opt in interaction.data.get('options', [])}
     log_command(interaction, options, was_successful=False)
 
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [ERROR] Unhandled error in command '/{command_name}': {error}")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [ERROR] Unhandled error in command '/{command_name}': {error}")
 
     error_message = "An unexpected error occurred. The developers have been notified."
     if isinstance(error, app_commands.CommandOnCooldown):
@@ -396,10 +279,9 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         else:
             await interaction.followup.send(error_message, ephemeral=True)
     except discord.errors.InteractionResponded:
-        pass  # If we already responded in the command's own error handling, that's fine.
+        pass # If we already responded in the command's own error handling, that's fine.
     except Exception as e:
         print(f"[ERROR] Failed to send error message to user: {e}")
-
 
 # ======================================================================================================================
 # EconomyManager Class
@@ -420,60 +302,38 @@ class EconomyManager():
                 cursor.execute("INSERT OR IGNORE INTO economy (user_id) VALUES (?)", (user_id,))
 
                 # Check if a new row was actually inserted.
-                # cursor.rowcount will be 1 if the user was new, and 0 if they already existed.
                 if cursor.rowcount > 0:
                     print(f"[Economy] New user created: {user_id}. Giving default balance.")
-                    # The database already set the default values, so we don't need to do anything else here.
-                    # We can now commit this new user to the database.
                     conn.commit()
 
                 # Now, select the balances. This is guaranteed to find a row.
                 cursor.execute("SELECT wallet_balance, bank_balance FROM economy WHERE user_id = ?", (user_id,))
                 balances = cursor.fetchone()
 
-                # Return balances for user.
                 if balances:
-                    return balances  # Returns (wallet_balance, bank_balance)
+                    return balances # Returns (wallet_balance, bank_balance)
                 else:
-                    # This is a fallback case, it should ideally never be reached.
-                    print(
-                        f"[FATAL EconomyManager.get_balance ERROR] Could not fetch balance for user {user_id} after get-or-create.")
-                    return (0, 0)  # Return a safe default on error
+                    print(f"[FATAL EconomyManager.get_balance ERROR] Could not fetch balance for user {user_id} after get-or-create.")
+                    return (None, None)
 
         except Exception as e:
             print(f"[FATAL EconomyManager.get_balance ERROR] Failed to connect to Database for {user_id}: {e}")
-            return (0, 0)  # Return a safe default on error
+            return (None, None)
 
     @staticmethod
     def update_wallet_balance(user_id: int, amount: int):
         """
         Adds or subtracts a specified amount from a user's wallet balance.
         The amount can be positive (to add) or negative (to subtract).
-
-        Args:
-            user_id: The Discord ID of the user.
-            amount: The amount of money to add or subtract.
-
-        Returns:
-            True if the update was successful, False otherwise.
+        Returns True if successful, False otherwise.
         """
         try:
             with sqlite3.connect(DB_FILE) as conn:
                 cursor = conn.cursor()
-
-                current_wallet, _ = EconomyManager.get_balance(user_id)
-                if current_wallet is None:  # This would mean a DB error happened in get_balance
-                    return False
-
-                new_wallet = current_wallet + amount
-
-                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?",
-                               (new_wallet, user_id))
+                cursor.execute("UPDATE economy SET wallet_balance = wallet_balance + ? WHERE user_id = ?", (amount, user_id))
                 conn.commit()
-
-                print(f"[Economy] Updated user {user_id} wallet by {amount}. New balance: {new_wallet}")
+                print(f"[Economy] Updated user {user_id} wallet by {amount}.")
                 return True
-
         except sqlite3.Error as e:
             print(f"[FATAL EconomyManager.update_wallet_balance ERROR] Database error for user {user_id}: {e}")
             return False
@@ -482,40 +342,23 @@ class EconomyManager():
     def deposit(user_id: int, amount: int):
         """
         Deposits a specified amount from a user's wallet into their bank.
-
-        Args:
-            user_id: The Discord ID of the user.
-            amount: The amount of money to deposit.
-
-        Returns:
-            A string indicating the status: "success", "insufficient_funds", "invalid_amount", or "db_error".
+        Returns a string indicating the status: "success", "insufficient_funds", "invalid_amount", or "db_error".
         """
-        # 1. Input Validation: Ensure the amount is a positive number.
         if amount <= 0:
             return "invalid_amount"
-
         try:
             with sqlite3.connect(DB_FILE) as conn:
                 cursor = conn.cursor()
+                wallet_balance, _ = EconomyManager.get_balance(user_id)
+                if wallet_balance is None: return "db_error"
+                if amount > wallet_balance: return "insufficient_funds"
 
-                # 2. Get current balance and ensure the user exists.
-                # We don't need a separate check; get_balance handles user creation.
-                wallet_balance, bank_balance = EconomyManager.get_balance(user_id)
-
-                # 3. Check for sufficient funds in the wallet.
-                if amount > wallet_balance:
-                    return "insufficient_funds"
-
-                # 4. Perform the atomic transaction: subtract from wallet, add to bank.
                 new_wallet = wallet_balance - amount
-                new_bank = bank_balance + amount
-                cursor.execute("UPDATE economy SET wallet_balance = ?, bank_balance = ? WHERE user_id = ?",
-                               (new_wallet, new_bank, user_id))
+                new_bank = _ + amount
+                cursor.execute("UPDATE economy SET wallet_balance = ?, bank_balance = ? WHERE user_id = ?", (new_wallet, new_bank, user_id))
                 conn.commit()
-
                 print(f"[Economy] User {user_id} deposited {amount}. New balance: Wallet={new_wallet}, Bank={new_bank}")
                 return "success"
-
         except sqlite3.Error as e:
             print(f"[FATAL EconomyManager.deposit ERROR] Database error for user {user_id}: {e}")
             return "db_error"
@@ -524,39 +367,23 @@ class EconomyManager():
     def withdraw(user_id: int, amount: int):
         """
         Withdraws a specified amount from a user's bank into their wallet.
-
-        Args:
-            user_id: The Discord ID of the user.
-            amount: The amount of money to withdraw.
-
-        Returns:
-            A string indicating the status: "success", "insufficient_funds", "invalid_amount", or "db_error".
+        Returns a string indicating the status: "success", "insufficient_funds", "invalid_amount", or "db_error".
         """
-        # 1. Input Validation: Ensure the amount is a positive number.
         if amount <= 0:
             return "invalid_amount"
-
         try:
             with sqlite3.connect(DB_FILE) as conn:
                 cursor = conn.cursor()
-
-                # 2. Get current balance and ensure the user exists.
                 wallet_balance, bank_balance = EconomyManager.get_balance(user_id)
+                if bank_balance is None: return "db_error"
+                if amount > bank_balance: return "insufficient_funds"
 
-                # 3. Check for sufficient funds in the bank.
-                if amount > bank_balance:
-                    return "insufficient_funds"
-
-                # 4. Perform the atomic transaction: add to wallet, subtract from bank.
                 new_wallet = wallet_balance + amount
                 new_bank = bank_balance - amount
-                cursor.execute("UPDATE economy SET wallet_balance = ?, bank_balance = ? WHERE user_id = ?",
-                               (new_wallet, new_bank, user_id))
+                cursor.execute("UPDATE economy SET wallet_balance = ?, bank_balance = ? WHERE user_id = ?", (new_wallet, new_bank, user_id))
                 conn.commit()
-
                 print(f"[Economy] User {user_id} withdrew {amount}. New balance: Wallet={new_wallet}, Bank={new_bank}")
                 return "success"
-
         except sqlite3.Error as e:
             print(f"[FATAL EconomyManager.withdraw ERROR] Database error for user {user_id}: {e}")
             return "db_error"
@@ -565,58 +392,117 @@ class EconomyManager():
     def send(sender_user_id: int, receiver_user_id: int, amount: int):
         """
         Transfers a specified amount from a user's wallet into another user's wallet.
-
-        Args:
-            sender_user_id: The Discord ID of the sending user.
-            receiver_user_id: The Discord ID of the receiving user.
-            amount: The amount of money to send.
-
-        Returns:
-            A string indicating the status: "success", "insufficient_funds", "invalid_amount", "self_transfer", or "db_error".
+        Returns a string indicating the status: "success", "insufficient_funds", "invalid_amount", "self_transfer", or "db_error".
         """
-        # 1. Input Validation
         if amount <= 0:
             return "invalid_amount"
         if sender_user_id == receiver_user_id:
             return "self_transfer"
-
         try:
             with sqlite3.connect(DB_FILE) as conn:
                 cursor = conn.cursor()
-
-                # 2. Get sender's balance and check for sufficient funds
                 sender_wallet, _ = EconomyManager.get_balance(sender_user_id)
-                if sender_wallet is None:
-                    return "db_error"  # Sender couldn't be fetched/created
-                if amount > sender_wallet:
-                    return "insufficient_funds"
+                if sender_wallet is None: return "db_error"
+                if amount > sender_wallet: return "insufficient_funds"
 
-                # 3. Ensure receiver exists in the database (get_balance creates them if new)
                 receiver_wallet, _ = EconomyManager.get_balance(receiver_user_id)
-                if receiver_wallet is None:
-                    return "db_error"  # Receiver couldn't be fetched/created
+                if receiver_wallet is None: return "db_error"
 
-                # 4. Perform the atomic transaction
-                # Subtract from sender
+                # Perform the atomic transaction
                 new_sender_wallet = sender_wallet - amount
-                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?",
-                               (new_sender_wallet, sender_user_id))
-
-                # Add to receiver
+                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?", (new_sender_wallet, sender_user_id))
                 new_receiver_wallet = receiver_wallet + amount
-                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?",
-                               (new_receiver_wallet, receiver_user_id))
-
+                cursor.execute("UPDATE economy SET wallet_balance = ? WHERE user_id = ?", (new_receiver_wallet, receiver_user_id))
                 conn.commit()
-
                 print(f"[Economy] User {sender_user_id} sent {amount} to {receiver_user_id}.")
                 return "success"
-
         except sqlite3.Error as e:
-            print(
-                f"[FATAL EconomyManager.send ERROR] Database error between {sender_user_id} and {receiver_user_id}: {e}")
+            print(f"[FATAL EconomyManager.send ERROR] Database error between {sender_user_id} and {receiver_user_id}: {e}")
             return "db_error"
 
+# ======================================================================================================================
+# UI Views
+# ======================================================================================================================
+
+class CoinflipView(discord.ui.View):
+    def __init__(self, author_id: int, bet_amount: int, original_interaction: discord.Interaction):
+        super().__init__(timeout=60)
+        self.author_id = author_id
+        self.bet_amount = bet_amount
+        self.original_interaction = original_interaction
+        self.choice = None
+
+    async def handle_game_end(self, interaction: discord.Interaction):
+        """This function contains all logic for when the game ends."""
+        await interaction.response.defer()
+
+        try:
+            coin_flip_result = random.choice(["Heads", "Tails"])
+            is_winner = (self.choice == coin_flip_result)
+
+            if is_winner:
+                EconomyManager.update_wallet_balance(self.author_id, self.bet_amount)
+                result_message = f"It was **{coin_flip_result}**! You won **${self.bet_amount:,}**! 🎉"
+                final_color = discord.Color.gold()
+            else:
+                EconomyManager.update_wallet_balance(self.author_id, -self.bet_amount)
+                result_message = f"It was **{coin_flip_result}**! You lost **${self.bet_amount:,}**. 😥"
+                final_color = discord.Color.red()
+
+            new_wallet, new_bank = EconomyManager.get_balance(self.author_id)
+
+            result_embed = discord.Embed(
+                title="Coinflip Result",
+                description=result_message,
+                color=final_color
+            )
+            result_embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
+            result_embed.add_field(name=":dollar: Wallet", value=f"**${new_wallet:,}**", inline=True)
+            result_embed.add_field(name=":bank: Bank", value=f"**${new_bank:,}**", inline=True)
+
+            for item in self.children:
+                item.disabled = True
+            
+            await self.original_interaction.edit_original_response(embed=result_embed, view=self)
+
+        except Exception as e:
+            print(f"[ERROR] Coinflip game failed for user {self.author_id}: {e}")
+            await interaction.followup.send("❌ An unexpected error occurred during the coinflip. Your balance has not been changed.", ephemeral=True)
+        finally:
+            self.stop()
+
+    @discord.ui.button(label="Heads", style=discord.ButtonStyle.primary, emoji="🪙")
+    async def heads_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This is not your game!", ephemeral=True)
+            return
+        self.choice = "Heads"
+        await self.handle_game_end(interaction)
+
+    @discord.ui.button(label="Tails", style=discord.ButtonStyle.secondary, emoji="🪙")
+    async def tails_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message("This is not your game!", ephemeral=True)
+            return
+        self.choice = "Tails"
+        await self.handle_game_end(interaction)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        
+        timeout_embed = discord.Embed(
+            title="Coinflip Timed Out",
+            description="You did not make a selection in time. Your balance has not been changed.",
+            color=discord.Color.dark_grey()
+        )
+        
+        try:
+            await self.original_interaction.edit_original_response(embed=timeout_embed, view=self)
+        except discord.NotFound:
+            pass # Message was likely deleted
+        finally:
+            self.stop()
 
 # ======================================================================================================================
 # COMMANDS
@@ -628,26 +514,21 @@ async def hello_command(interaction: discord.Interaction, ephemeral: bool = Fals
     await interaction.response.send_message(f"Hello, {interaction.user.mention}!", ephemeral=ephemeral)
     log_command(interaction, {'ephemeral': ephemeral}, was_successful=True)
 
-
 @tree.command(name="greet", description="Greets you back!")
 @app_commands.describe(ephemeral="Hide message and response from others.")
 async def greet_command(interaction: discord.Interaction, ephemeral: bool = False):
     greet_command_greetings = (" nigger", " faggot", " retard", "")
     if interaction.user.id in OWNER_IDS:
         await interaction.response.send_message(f"Hey Bobek <3 {interaction.user.mention}!", ephemeral=ephemeral)
-    elif interaction.user.id == 1350499151418359901:  # For Roadbobek
-        await interaction.response.send_message(f"Hey baby :kissing_heart: {interaction.user.mention}",
-                                                ephemeral=ephemeral)
-    elif interaction.user.id in [1371270077957144707, 1406691426036617297]:  # For Chrome / extinc
-        await interaction.response.send_message(f"Hey cutie :stuck_out_tongue_winking_eye: {interaction.user.mention}",
-                                                ephemeral=ephemeral)
-    elif interaction.user.id == 1261168774967726158:  # For player
+    elif interaction.user.id == 1350499151418359901: # For Roadbobek
+        await interaction.response.send_message(f"Hey baby :kissing_heart: {interaction.user.mention}", ephemeral=ephemeral)
+    elif interaction.user.id in [1371270077957144707, 1406691426036617297]: # For Chrome / extinc
+        await interaction.response.send_message(f"Hey cutie :stuck_out_tongue_winking_eye: {interaction.user.mention}", ephemeral=ephemeral)
+    elif interaction.user.id == 1261168774967726158: # For player
         await interaction.response.send_message(f"Hey buddy <: {interaction.user.mention}!", ephemeral=ephemeral)
     else:
-        await interaction.response.send_message(
-            f"Fuck you{random.choice(greet_command_greetings)}! {interaction.user.mention}", ephemeral=ephemeral)
+        await interaction.response.send_message(f"Fuck you{random.choice(greet_command_greetings)}! {interaction.user.mention}", ephemeral=ephemeral)
     log_command(interaction, {'ephemeral': ephemeral}, was_successful=True)
-
 
 @tree.command(name="ip-info", description="Get information about an IP address.")
 @discord.app_commands.describe(ip_address="The IP address to look up (e.g., 8.8.8.8)")
@@ -659,18 +540,13 @@ async def ip_info_command(interaction: discord.Interaction, ip_address: str, eph
         response.raise_for_status()
         ip_api = response.json()
         if ip_api.get('status') == "success":
-            embed = discord.Embed(title=f"IP Lookup Results for {ip_api.get('query', 'N/A')}",
-                                  color=discord.Color.blue())
-            embed.add_field(name="Status", value=f":white_check_mark: {ip_api.get('status', 'N/A').capitalize()}",
-                            inline=False)
-            embed.add_field(name="Country",
-                            value=f"{ip_api.get('country', 'N/A')} ({ip_api.get('countryCode', 'N/A')})", inline=True)
-            embed.add_field(name="Region", value=f"{ip_api.get('regionName', 'N/A')} ({ip_api.get('region', 'N/A')})",
-                            inline=True)
+            embed = discord.Embed(title=f"IP Lookup Results for {ip_api.get('query', 'N/A')}", color=discord.Color.blue())
+            embed.add_field(name="Status", value=f":white_check_mark: {ip_api.get('status', 'N/A').capitalize()}", inline=False)
+            embed.add_field(name="Country", value=f"{ip_api.get('country', 'N/A')} ({ip_api.get('countryCode', 'N/A')})", inline=True)
+            embed.add_field(name="Region", value=f"{ip_api.get('regionName', 'N/A')} ({ip_api.get('region', 'N/A')})", inline=True)
             embed.add_field(name="City", value=f"{ip_api.get('city', 'N/A')}", inline=True)
             embed.add_field(name="ZIP Code", value=f"{ip_api.get('zip', 'N/A')}", inline=True)
-            embed.add_field(name="Coordinates",
-                            value=f"Lat: {ip_api.get('lat', 'N/A')}, Lon: {ip_api.get('lon', 'N/A')}", inline=True)
+            embed.add_field(name="Coordinates", value=f"Lat: {ip_api.get('lat', 'N/A')}, Lon: {ip_api.get('lon', 'N/A')}", inline=True)
             embed.add_field(name="Timezone", value=f"{ip_api.get('timezone', 'N/A')}", inline=True)
             embed.add_field(name="ISP", value=f"{ip_api.get('isp', 'N/A')}", inline=False)
             embed.add_field(name="Organization", value=f"{ip_api.get('org', 'N/A')}", inline=False)
@@ -679,11 +555,9 @@ async def ip_info_command(interaction: discord.Interaction, ip_address: str, eph
             await interaction.followup.send(embed=embed)
             log_command(interaction, {'ip_address': ip_address, 'ephemeral': ephemeral}, was_successful=True)
         else:
-            await interaction.followup.send(
-                f"API Error: Could not find information for the IP address `{ip_address}`. Reason: {ip_api.get('message')}")
+            await interaction.followup.send(f"API Error: Could not find information for the IP address `{ip_address}`. Reason: {ip_api.get('message')}")
     except requests.exceptions.RequestException:
         await interaction.followup.send(f"Error: An error occurred while trying to contact the IP lookup service.")
-
 
 @tree.command(name="ask-ai", description="Ask a question to the AI.")
 @discord.app_commands.describe(prompt="The question you want to ask the AI.")
@@ -697,7 +571,6 @@ async def ask_ai_command(interaction: discord.Interaction, prompt: str, ephemera
         log_command(interaction, {'prompt': prompt, 'ephemeral': ephemeral}, was_successful=True)
     except Exception as e:
         await interaction.followup.send("Sorry, I encountered an error while trying to answer your question.")
-
 
 @tree.command(name="balance", description="Check a persons balance.")
 @app_commands.describe(user="Person to check balance for.")
@@ -723,7 +596,6 @@ async def balance_command(interaction: discord.Interaction, user: discord.Member
         await interaction.followup.send(f"An unknown error occurred, {e}.", ephemeral=True)
         print(f"[ERROR] Unknown error in /balance: ({e}).")
 
-
 @tree.command(name="deposit", description="Deposit money from your wallet into your bank.")
 @app_commands.describe(amount="The amount to deposit. Use 'all' to deposit everything.")
 @app_commands.describe(ephemeral="Hide message and response from others.")
@@ -732,8 +604,7 @@ async def deposit_command(interaction: discord.Interaction, amount: str, ephemer
     wallet_balance, _ = EconomyManager.get_balance(user_id)
 
     if wallet_balance is None:
-        await interaction.response.send_message(":cross_mark: Could not fetch your balance due to a database error.",
-                                                ephemeral=True)
+        await interaction.response.send_message(":cross_mark: Could not fetch your balance due to a database error.", ephemeral=True)
         log_command(interaction, {'amount': amount}, was_successful=False)
         return
 
@@ -755,18 +626,14 @@ async def deposit_command(interaction: discord.Interaction, amount: str, ephemer
     status = EconomyManager.deposit(user_id, deposit_amount)
 
     if status == "success":
-        await interaction.response.send_message(
-            f":white_check_mark: Successfully deposited **${deposit_amount:,}** into your bank!", ephemeral=ephemeral)
+        await interaction.response.send_message(f":white_check_mark: Successfully deposited **${deposit_amount:,}** into your bank!", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=True)
     elif status == "insufficient_funds":
-        await interaction.response.send_message(
-            ":cross_mark: You don't have that much money in your wallet to deposit.", ephemeral=ephemeral)
+        await interaction.response.send_message(":cross_mark: You don't have that much money in your wallet to deposit.", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=False)
-    else:  # db_error or invalid_amount
-        await interaction.response.send_message("An error occurred. Please enter a valid positive amount.",
-                                                ephemeral=ephemeral)
+    else: # db_error or invalid_amount
+        await interaction.response.send_message("An error occurred. Please enter a valid positive amount.", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=False)
-
 
 @tree.command(name="withdraw", description="Withdraw money from your bank into your wallet.")
 @app_commands.describe(amount="The amount to withdraw. Use 'all' to withdraw everything.")
@@ -776,8 +643,7 @@ async def withdraw_command(interaction: discord.Interaction, amount: str, epheme
     _, bank_balance = EconomyManager.get_balance(user_id)
 
     if bank_balance is None:
-        await interaction.response.send_message(":cross_mark: Could not fetch your balance due to a database error.",
-                                                ephemeral=True)
+        await interaction.response.send_message(":cross_mark: Could not fetch your balance due to a database error.", ephemeral=True)
         log_command(interaction, {'amount': amount}, was_successful=False)
         return
 
@@ -799,18 +665,14 @@ async def withdraw_command(interaction: discord.Interaction, amount: str, epheme
     status = EconomyManager.withdraw(user_id, withdraw_amount)
 
     if status == "success":
-        await interaction.response.send_message(
-            f":white_check_mark: Successfully withdrew **${withdraw_amount:,}** from your bank!", ephemeral=ephemeral)
+        await interaction.response.send_message(f":white_check_mark: Successfully withdrew **${withdraw_amount:,}** from your bank!", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=True)
     elif status == "insufficient_funds":
-        await interaction.response.send_message(":cross_mark: You don't have that much money in your bank to withdraw.",
-                                                ephemeral=ephemeral)
+        await interaction.response.send_message(":cross_mark: You don't have that much money in your bank to withdraw.", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=False)
-    else:  # db_error or invalid_amount
-        await interaction.response.send_message("An error occurred. Please enter a valid positive amount.",
-                                                ephemeral=ephemeral)
+    else: # db_error or invalid_amount
+        await interaction.response.send_message("An error occurred. Please enter a valid positive amount.", ephemeral=ephemeral)
         log_command(interaction, {'amount': amount}, was_successful=False)
-
 
 @tree.command(name="send", description="Send money from your wallet to another user.")
 @app_commands.describe(
@@ -831,175 +693,62 @@ async def send_command(interaction: discord.Interaction, receiver: discord.User,
     status = EconomyManager.send(sender.id, receiver.id, amount)
 
     if status == "success":
-        await interaction.response.send_message(
-            f":white_check_mark: You successfully sent **${amount:,}** to {receiver.mention}!")
+        await interaction.response.send_message(f":white_check_mark: You successfully sent **${amount:,}** to {receiver.mention}!")
         log_command(interaction, log_options, was_successful=True)
     elif status == "insufficient_funds":
-        await interaction.response.send_message(
-            ":cross_mark: You don't have enough money in your wallet to send that amount.", ephemeral=ephemeral)
+        await interaction.response.send_message(":cross_mark: You don't have enough money in your wallet to send that amount.", ephemeral=ephemeral)
         log_command(interaction, log_options, was_successful=False)
     elif status == "invalid_amount":
-        await interaction.response.send_message(":cross_mark: Please enter a positive amount to send.",
-                                                ephemeral=ephemeral)
+        await interaction.response.send_message(":cross_mark: Please enter a positive amount to send.", ephemeral=ephemeral)
         log_command(interaction, log_options, was_successful=False)
     elif status == "self_transfer":
         await interaction.response.send_message(":cross_mark: You cannot send money to yourself.", ephemeral=ephemeral)
         log_command(interaction, log_options, was_successful=False)
     else:  # db_error
-        await interaction.response.send_message("A database error occurred. Please try again later.",
-                                                ephemeral=ephemeral)
+        await interaction.response.send_message("A database error occurred. Please try again later.", ephemeral=ephemeral)
         log_command(interaction, log_options, was_successful=False)
-
-
-class CoinflipView(discord.ui.View):
-    def __init__(self, author_id: int, original_interaction: discord.Interaction):
-        super().__init__(timeout=60)  # Set the timeout (e.g., 60 seconds)
-        self.author_id = author_id
-        self.original_interaction = original_interaction
-        self.result = None
-
-    # This decorator creates a button
-    @discord.ui.button(label="Heads", style=discord.ButtonStyle.primary,
-                       emoji="\N{COIN}")
-    async def heads_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # This code runs when the "Heads" button is clicked
-        # First, check if the person who clicked is the one who started the game
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("This is not your game!", ephemeral=True)
-            return
-
-        # Run the game logic
-        self.result = "Heads"
-        await self.end_game(interaction)
-
-    @discord.ui.button(label="Tails", style=discord.ButtonStyle.secondary,
-                       emoji="\N{COIN}")
-    async def tails_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # This code runs when the "Tails" button is clicked
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message("This is not your game!", ephemeral=True)
-            return
-
-        self.result = "Tails"
-        await self.end_game(interaction)
-
-    async def on_timeout(self):
-        """
-        This function is automatically called when the view's timeout is reached.
-        """
-        print(f"[COINFLIP] Game for user {self.author_id} timed out.")
-
-        # Disable all the buttons
-        for item in self.children:
-            item.disabled = True
-
-        # Create a new embed or message to show the timeout status
-        timeout_embed = discord.Embed(
-            title="Coinflip Timed Out",
-            description="You did not make a selection in time.",
-            color=discord.Color.red()
-        )
-
-        # Use the stored original_interaction to edit the message.
-        # We use followup.edit_message because the initial response has already been sent.
-        try:
-            await self.original_interaction.edit_original_response(embed=timeout_embed, view=self)
-        except discord.NotFound:
-            # This can happen if the original message was deleted by a moderator
-            print(f"[WARN] Could not edit original coinflip message for user {self.author_id} as it was not found.")
-        except Exception as e:
-            print(f"[ERROR] Failed to edit message on timeout: {e}")
-
-    async def end_game(self, interaction: discord.Interaction):
-        # Flip the coin
-        coin_flip = random.choice(["Heads", "Tails"])
-
-        # Determine winner
-        is_winner = (self.result == coin_flip)
-
-        # Create the result message
-        result_message = f"It was **{coin_flip}**! "
-        if is_winner:
-            result_message += "You won! 🎉"
-        else:
-            result_message += "You lost. 😥"
-
-        # Disable all buttons in this view so they can't be clicked again
-        for item in self.children:
-            item.disabled = True
-
-        # Edit the original message to show the result and the disabled buttons
-        await interaction.response.edit_message(content=result_message, view=self)
-
-        # Stop the view from listening for any more clicks
-        self.stop()
-
 
 @tree.command(name="singleplayer-coinflip", description="Singleplayer coinflip gambling.")
 @app_commands.describe(amount="Amount to gamble, or 'all'.")
 @app_commands.describe(ephemeral="Hide message and response from others.")
 async def sp_coinflip_command(interaction: discord.Interaction, amount: str, ephemeral: bool = False):
+    await interaction.response.defer(ephemeral=ephemeral)
     user = interaction.user
     wallet_balance, bank_balance = EconomyManager.get_balance(user.id)
 
+    if wallet_balance is None:
+        await interaction.followup.send("Could not fetch your balance due to a database error.", ephemeral=True)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+
     try:
         if amount.lower() == 'all':
-            amount = wallet_balance
+            bet_amount = wallet_balance
         else:
-            amount = int(amount)
+            bet_amount = int(amount)
     except ValueError:
-        await interaction.response.send_message("Please enter a valid number or 'all'.", ephemeral=ephemeral)
-        log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
+        await interaction.followup.send("Please enter a valid number or 'all'.", ephemeral=True)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
 
-    if wallet_balance is not None:
-        if amount == 0:
-            await interaction.response.send_message(f"You cannot gamble $0...", ephemeral=ephemeral)
-            log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
-        elif amount < 0:
-            await interaction.response.send_message(f"You cannot gamble a negative number...", ephemeral=ephemeral)
-            log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
-        elif wallet_balance < amount:
-            await interaction.response.defer(ephemeral=ephemeral)
-            print(f"[ERROR] Database error in /singleplayer-coinflip for user {user.id}, wallet_balance is None.")
-            embed = discord.Embed(
-                title=f"You do not have **${amount:,}** to gamble, gamble an amount you have in your wallet or withdraw it.",
-                color=discord.Color.green())
-            embed.set_author(name=user.display_name, icon_url=user.display_avatar)
-            embed.add_field(name=":dollar: Wallet", value=f"**${wallet_balance:,}**", inline=True)
-            embed.add_field(name=":bank: Bank", value=f"**${bank_balance:,}**", inline=True)
-            embed.set_footer(text=f"Total: ${wallet_balance + bank_balance:,}")
-            await interaction.followup.send(embed=embed)
-            log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
-        else:
-            await interaction.response.defer(ephemeral=ephemeral)
-            try:
-                embed = discord.Embed(title=f"Gambling **${amount:,}**", color=discord.Color.green())
-                embed.add_field(name=":dollar: Wallet", value=f"**${wallet_balance:,}**", inline=True)
-                embed.add_field(name=":bank: Bank", value=f"**${bank_balance:,}**", inline=True)
-                view = CoinflipView(author_id=user.id, original_interaction=interaction)
-                await interaction.followup.send(embed=embed, view=view)
-                await view.wait()
+    if bet_amount <= 0:
+        await interaction.followup.send("You cannot gamble $0 or less.", ephemeral=True)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
+    
+    if wallet_balance < bet_amount:
+        await interaction.followup.send(f"You do not have **${bet_amount:,}** to gamble.", ephemeral=True)
+        log_command(interaction, {'amount': amount}, was_successful=False)
+        return
 
-                if view.result is not None:  # If a button was clicked
-                    coin_flip_result = random.choice(["Heads", "Tails"])  # This should be the same as in the view
-                    is_winner = (view.result == coin_flip_result)
-
-                    if is_winner:
-                        EconomyManager.update_wallet_balance(user.id, amount)
-                        print(f"[COINFLIP] User {user.id} won {amount}")
-                    else:
-                        EconomyManager.update_wallet_balance(user.id, -amount)
-                        print(f"[COINFLIP] User {user.id} lost {amount}")
-
-            except Exception as e:
-                print(f"[ERROR] Unknown Error in /singleplayer-coinflip for user {user.id}.")
-                await interaction.followup.send(f"An unknown error occurred, {e}.", ephemeral=True)
-                log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
-    else:
-        print(f"[ERROR] Database error in /singleplayer-coinflip for user {user.id}, wallet_balance is None.")
-        await interaction.response.send_message(f"An unknown error occurred, the developers have been notified.",
-                                                ephemeral=True)
-        log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
+    embed = discord.Embed(title=f"Gambling **${bet_amount:,}**", color=discord.Color.green())
+    embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
+    embed.add_field(name=":dollar: Wallet", value=f"**${wallet_balance:,}**", inline=True)
+    embed.add_field(name=":bank: Bank", value=f"**${bank_balance:,}**", inline=True)
+    
+    view = CoinflipView(author_id=user.id, bet_amount=bet_amount, original_interaction=interaction)
+    await interaction.followup.send(embed=embed, view=view)
+    log_command(interaction, {'amount': amount}, was_successful=True)
 
 
 @tree.command(name="owner", description="Execute a private, owner-only command.")
@@ -1013,10 +762,8 @@ async def owner_command(interaction: discord.Interaction, command: str, ephemera
         await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
         return
 
-    # The visibility of the entire interaction is determined by this first response.
     await interaction.response.defer(ephemeral=ephemeral)
 
-    # --- Argument Parser ---
     parts = command.strip().split()
     subcommand = parts[0].lower() if parts else ''
     positional_args = []
@@ -1033,41 +780,49 @@ async def owner_command(interaction: discord.Interaction, command: str, ephemera
 
     log_command(interaction, {'command': command, 'ephemeral': ephemeral}, was_successful=True)
 
-    # --- Subcommand Router ---
     if subcommand == 'help':
-        embed = discord.Embed(title="Owner Command Help", description="Here are the available private commands:",
-                              color=discord.Color.gold())
+        embed = discord.Embed(title="Owner Command Help", description="Here are the available private commands:", color=discord.Color.gold())
         embed.add_field(name="`help`", value="Shows this help message.", inline=False)
         embed.add_field(name="`shutdown`", value="Shuts down the bot safely.", inline=False)
-        embed.add_field(name="`repeat <text> [times=1]`",
-                        value="Repeats the text you provide. `times` is an optional integer.", inline=False)
+        embed.add_field(name="`repeat <text> [times=1]`", value="Repeats the text you provide. `times` is an optional integer.", inline=False)
+        embed.add_field(name="`money <user_id> <amount>`", value="Edits money for specified user.", inline=False)
         embed.set_footer(text="Syntax: <command> [positional_args] [keyword=value]")
         await interaction.followup.send(embed=embed)
-
     elif subcommand == 'shutdown':
         await interaction.followup.send("Bot is shutting down.")
         await client.close()
-
     elif subcommand == 'repeat':
         if not positional_args:
             await interaction.followup.send("Error: You must provide text to repeat.", ephemeral=True)
             return
-
         text_to_repeat = ' '.join(positional_args)
         try:
             repeat_count = int(keyword_args.get('times', 1))
         except (ValueError, TypeError):
             repeat_count = 1
-
-        repeat_count = min(repeat_count, 10)  # Prevent abuse
-
+        repeat_count = min(repeat_count, 10)
         final_message = '\n'.join([text_to_repeat] * repeat_count)
         await interaction.followup.send(final_message)
-
+    elif subcommand == 'money':
+        if not positional_args:
+            await interaction.followup.send("Error: you must provide a Discord user id and the amount to change by, (/owner money <user_id> <amount>)", ephemeral=True)
+            log_command(interaction, {'command': command, 'ephemeral': ephemeral}, was_successful=False)
+            return
+        try:
+            EconomyManager.update_wallet_balance(positional_args[0], positional_args[1])
+            log_command(interaction, {'command': command, 'ephemeral': ephemeral}, was_successful=True)
+            await interaction.followup.send(
+                f"Changed wallet balance for {positional_args[0]} by {positional_args[1]}.",
+                ephemeral=ephemeral)
+        except Exception as e:
+            repeat_count = 1
+            await interaction.followup.send(f"Error: you must provide a Discord user id and the amount to change by, (/owner money <user_id> <amount>): {e}", ephemeral=True)
+            print(f"Error: you must provide a Discord user id and the amount to change by, (/owner money <user_id> <amount>): {e}")
+            log_command(interaction, {'command': command, 'ephemeral': ephemeral}, was_successful=False)
     else:
-        await interaction.followup.send(f"Error: Unknown owner command '{subcommand}'. Type 'help' for a list.",
-                                        ephemeral=True)
-
+        await interaction.followup.send(f"Error: Unknown owner command '{subcommand}'. Type 'help' for a list.", ephemeral=True)
+        print(f"Error: Unknown owner command '{subcommand}'. Type 'help' for a list.")
+        log_command(interaction, {'command': command, 'ephemeral': ephemeral}, was_successful=False)
 
 # --- TempMail Command Group ---
 class TempMailGroup(app_commands.Group):
@@ -1089,9 +844,7 @@ class TempMailGroup(app_commands.Group):
         loop = asyncio.get_running_loop()
         api_response = await loop.run_in_executor(None, self.make_api_call, session, "get_email_address")
         guerrilla_sessions[interaction.user.id] = session
-        embed = discord.Embed(title="Your Temporary Email Address",
-                              description=f"Your new temporary email is **`{api_response.get('email_addr')}`**.",
-                              color=discord.Color.blue())
+        embed = discord.Embed(title="Your Temporary Email Address", description=f"Your new temporary email is **`{api_response.get('email_addr')}`**.", color=discord.Color.blue())
         embed.add_field(name="Expires", value=f"<t:{int(api_response.get('email_timestamp')) + 3600}:R>", inline=False)
         embed.set_footer(text="Use /tempmail check to see your inbox.")
         await interaction.followup.send(embed=embed)
@@ -1103,25 +856,20 @@ class TempMailGroup(app_commands.Group):
         await interaction.response.defer(ephemeral=ephemeral)
         session = guerrilla_sessions.get(interaction.user.id)
         if not session:
-            await interaction.followup.send(
-                "You don't have an active temporary email. Use `/tempmail get` to create one first.")
+            await interaction.followup.send("You don't have an active temporary email. Use `/tempmail get` to create one first.")
             return
         loop = asyncio.get_running_loop()
         api_response = await loop.run_in_executor(None, self.make_api_call, session, "get_email_list", {'offset': 0})
         email_list = api_response.get('list', [])
         if not email_list:
-            embed = discord.Embed(title="Your Inbox is Empty", description="There are no emails in your inbox.",
-                                  color=discord.Color.blue())
+            embed = discord.Embed(title="Your Inbox is Empty", description="There are no emails in your inbox.", color=discord.Color.blue())
             await interaction.followup.send(embed=embed)
         else:
-            embed = discord.Embed(title="Your Inbox",
-                                  description=f"Showing the first {len(email_list)} emails in your inbox.",
-                                  color=discord.Color.blue())
+            embed = discord.Embed(title="Your Inbox", description=f"Showing the first {len(email_list)} emails in your inbox.", color=discord.Color.blue())
             for email in email_list:
                 subject = html.unescape(email.get('mail_subject', 'No Subject'))
                 excerpt = html.unescape(email.get('mail_excerpt', '...'))
-                embed.add_field(name=f"ID: {email['mail_id']} | From: {email['mail_from']}",
-                                value=f"**{subject}**\n> {excerpt}", inline=False)
+                embed.add_field(name=f"ID: {email['mail_id']} | From: {email['mail_from']}", value=f"**{subject}**\n> {excerpt}", inline=False)
             embed.set_footer(text="Use /tempmail read <email_id> to read a full email.")
             await interaction.followup.send(embed=embed)
         log_command(interaction, {'ephemeral': ephemeral}, was_successful=True)
@@ -1133,25 +881,20 @@ class TempMailGroup(app_commands.Group):
         await interaction.response.defer(ephemeral=ephemeral)
         session = guerrilla_sessions.get(interaction.user.id)
         if not session:
-            await interaction.followup.send(
-                "You don't have an active temporary email. Use `/tempmail get` to create one first.")
+            await interaction.followup.send("You don't have an active temporary email. Use `/tempmail get` to create one first.")
             return
         loop = asyncio.get_running_loop()
-        api_response = await loop.run_in_executor(None, self.make_api_call, session, "fetch_email",
-                                                  {'email_id': email_id})
+        api_response = await loop.run_in_executor(None, self.make_api_call, session, "fetch_email", {'email_id': email_id})
         from_addr = html.unescape(api_response.get('mail_from', 'N/A'))
         subject = html.unescape(api_response.get('mail_subject', 'No Subject'))
         body = api_response.get('mail_body', 'No Content')
         clean_body = re.sub('<[^<]+?>', '', body)
-        embed = discord.Embed(title=f"Subject: {subject}", description=f"**From:** {from_addr}",
-                              color=discord.Color.orange())
+        embed = discord.Embed(title=f"Subject: {subject}", description=f"**From:** {from_addr}", color=discord.Color.orange())
         embed.add_field(name="Body", value=clean_body[:1024], inline=False)
         await interaction.followup.send(embed=embed)
         log_command(interaction, {'email_id': email_id, 'ephemeral': ephemeral}, was_successful=True)
 
-
 tree.add_command(TempMailGroup())
-
 
 # ======================================================================================================================
 # MAIN RUN
@@ -1170,11 +913,8 @@ async def main():
         except discord.errors.LoginFailure:
             print("[FATAL] LOGIN FAILED: The provided token is invalid.")
 
-
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("[SYSTEM] Shutdown forced by KeyboardInterrupt. Exiting cleanly.")
-
-# ======================================================================================================================
