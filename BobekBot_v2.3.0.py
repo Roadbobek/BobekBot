@@ -436,6 +436,12 @@ class CoinflipView(discord.ui.View):
         """This function contains all logic for when the game ends."""
         await interaction.response.defer()
 
+        # Handle wallet balance change in between command execution and face selection.
+        if EconomyManager.get_balance(self.author_id)[0] < self.bet_amount:
+            await interaction.followup.send("Your wallet balance changed! You no longer have enough money to cover the bet. Your balance has not been changed.", ephemeral=False)
+            self.stop()
+            return
+
         try:
             coin_flip_result = random.choice(["Heads", "Tails"])
             is_winner = (self.choice == coin_flip_result)
@@ -715,12 +721,10 @@ async def sp_coinflip_command(interaction: discord.Interaction, amount: str, eph
     await interaction.response.defer(ephemeral=ephemeral)
     user = interaction.user
     wallet_balance, bank_balance = EconomyManager.get_balance(user.id)
-
     if wallet_balance is None:
         await interaction.followup.send("Could not fetch your balance due to a database error.", ephemeral=True)
-        log_command(interaction, {'amount': amount}, was_successful=False)
+        log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
         return
-
     try:
         if amount.lower() == 'all':
             bet_amount = wallet_balance
@@ -728,28 +732,23 @@ async def sp_coinflip_command(interaction: discord.Interaction, amount: str, eph
             bet_amount = int(amount)
     except ValueError:
         await interaction.followup.send("Please enter a valid number or 'all'.", ephemeral=True)
-        log_command(interaction, {'amount': amount}, was_successful=False)
+        log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
         return
-
     if bet_amount <= 0:
-        await interaction.followup.send("You cannot gamble $0 or less.", ephemeral=True)
-        log_command(interaction, {'amount': amount}, was_successful=False)
+        await interaction.followup.send("You cannot gamble $0 or less...", ephemeral=True)
+        log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
         return
-    
     if wallet_balance < bet_amount:
         await interaction.followup.send(f"You do not have **${bet_amount:,}** to gamble.", ephemeral=True)
-        log_command(interaction, {'amount': amount}, was_successful=False)
+        log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
         return
-
     embed = discord.Embed(title=f"Gambling **${bet_amount:,}**", color=discord.Color.green())
     embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
     embed.add_field(name=":dollar: Wallet", value=f"**${wallet_balance:,}**", inline=True)
     embed.add_field(name=":bank: Bank", value=f"**${bank_balance:,}**", inline=True)
-    
     view = CoinflipView(author_id=user.id, bet_amount=bet_amount, original_interaction=interaction)
     await interaction.followup.send(embed=embed, view=view)
-    log_command(interaction, {'amount': amount}, was_successful=True)
-
+    log_command(interaction, {'amount': amount, 'ephemeral': ephemeral}, was_successful=False)
 
 @tree.command(name="owner", description="Execute a private, owner-only command.")
 @app_commands.describe(
