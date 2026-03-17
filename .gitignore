@@ -10,3 +10,6 @@
 # Python cache
 __pycache__/
 *.pyc
+
+# SQLite database files
+*.db
