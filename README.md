@@ -25,3 +25,4 @@ DISCORD_BOT_TOKEN=Kmdj5wMFi334CNM5eofn6mSkF7lFIW2mwMFiWSCN34Cfnf5fGck
 
 ---
 
+#### *!* *!* *!* this was all for fun dont take it too seriously *!* *!* *!* 
